@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import time
+import sqlAPI
 
 # --- Configuration ---
 LOGIN_URL = "https://admin.mydairydashboard.com/#/"
@@ -18,11 +19,11 @@ options.add_argument("--start-maximized")
 driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
 
 #companies
-pds = "https://admin.mydairydashboard.com/#/other-company-mdd/8152201"
+'''pds = "https://admin.mydairydashboard.com/#/other-company-mdd/8152201"
 gps = "https://admin.mydairydashboard.com/#/other-company-mdd/13789852"
 elanco = "https://admin.mydairydashboard.com/#/other-company-mdd/33425262"
 vitaplus ="https://admin.mydairydashboard.com/#/other-company-mdd/10641663"
-cargill ="https://admin.mydairydashboard.com/#/other-company-mdd/401013428351"
+cargill ="https://admin.mydairydashboard.com/#/other-company-mdd/401013428351"'''
 
 def companyCrawler(url):
     wait = WebDriverWait(driver, 10)
@@ -87,11 +88,15 @@ def main():
 
         # Step 6: Wait for successful login and redirect
         time.sleep(2)  # Adjust based on actual page load speed
-        companyCrawler(pds)
+        for i in sqlAPI():
+            url = str(i[1])
+            print(url)
+            companyCrawler(url)
+        '''companyCrawler(pds)
         companyCrawler(gps)
         companyCrawler(elanco)
         companyCrawler(vitaplus)
-        companyCrawler(cargill)
+        companyCrawler(cargill)'''
         
 
     except Exception as e:
