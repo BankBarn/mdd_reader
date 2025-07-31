@@ -25,7 +25,7 @@ elanco = "https://admin.mydairydashboard.com/#/other-company-mdd/33425262"
 vitaplus ="https://admin.mydairydashboard.com/#/other-company-mdd/10641663"
 cargill ="https://admin.mydairydashboard.com/#/other-company-mdd/401013428351"'''
 
-def companyCrawler(url):
+def companyCrawler(url,id):
     wait = WebDriverWait(driver, 10)
     driver.get(url)
     data_rows = []
@@ -39,6 +39,7 @@ def companyCrawler(url):
             cells = row.find_elements(By.TAG_NAME, "td")
             row_data = [cell.text.strip() for cell in cells]
             data_rows.append(row_data)
+            print(id + ": " + row_data[0] + " - " + row_data[1])
 
     # Step 3: Try to go to next page
         try:
@@ -50,7 +51,7 @@ def companyCrawler(url):
             next_btn.click()
             time.sleep(2)  # small wait for table to update
         except:
-            print("No more pages or next button not found.")
+            #print("No more pages or next button not found.")
             try:
                 first_btn = driver.find_element(By.LINK_TEXT, '1')
                 first_btn.click()
@@ -88,10 +89,11 @@ def main():
 
         # Step 6: Wait for successful login and redirect
         time.sleep(2)  # Adjust based on actual page load speed
-        for i in sqlAPI():
-            url = str(i[1])
-            print(url)
-            companyCrawler(url)
+        for i in sqlAPI.getEnterpriseAccounts():
+            url = str(i[2])
+            id = str(i[0])
+            companyCrawler(url, id)
+            break
         '''companyCrawler(pds)
         companyCrawler(gps)
         companyCrawler(elanco)

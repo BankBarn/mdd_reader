@@ -5,7 +5,7 @@ def getEnterpriseAccounts(*args, **kwargs):
     timeFilter = kwargs.get('t',"*")
     db_connection = sqlite3.connect('enterprise.db') 
     cursor = db_connection.cursor()
-    qry = cursor.execute('''SELECT  name, url FROM enterprise_customers''')
+    qry = cursor.execute('''SELECT  id, name, url FROM enterprise_customers''')
     row =[]
     for data in qry.fetchall():
         row.append(data)
