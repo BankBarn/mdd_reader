@@ -12,6 +12,18 @@ def getEnterpriseAccounts(*args, **kwargs):
     db_connection.close()
     return row
 
+def addFarm(enterpriseID, MDDid, farmName):
+    db_connection = sqlite3.connect('enterprise.db') 
+    cursor = db_connection.cursor()
+    cursor.execute('''INSERT INTO farms (name, mddid, enterpriseid) VALUES ("{}", "{}", "{}")'''.format(farmName.replace('"',""), MDDid, enterpriseID))
+    db_connection.commit()
+
+def clearFarms():
+    db_connection = sqlite3.connect('enterprise.db') 
+    cursor = db_connection.cursor()
+    cursor.execute('''DELETE FROM farms''')
+    db_connection.commit()
+
 def getFollowerCountsChart(*args, **kwargs):
     timeFilter = kwargs.get('t',"*")
     db_connection = sqlite3.connect('enterprise.db') 

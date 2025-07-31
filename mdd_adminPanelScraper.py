@@ -38,8 +38,8 @@ def companyCrawler(url,id):
         for row in rows:
             cells = row.find_elements(By.TAG_NAME, "td")
             row_data = [cell.text.strip() for cell in cells]
-            data_rows.append(row_data)
-            print(id + ": " + row_data[0] + " - " + row_data[1])
+            #data_rows.append(row_data)
+            sqlAPI.addFarm(id, row_data[0], row_data[1] )
 
     # Step 3: Try to go to next page
         try:
@@ -89,11 +89,11 @@ def main():
 
         # Step 6: Wait for successful login and redirect
         time.sleep(2)  # Adjust based on actual page load speed
+        sqlAPI.clearFarms()
         for i in sqlAPI.getEnterpriseAccounts():
             url = str(i[2])
             id = str(i[0])
             companyCrawler(url, id)
-            break
         '''companyCrawler(pds)
         companyCrawler(gps)
         companyCrawler(elanco)
