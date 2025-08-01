@@ -2,7 +2,6 @@ import sqlite3
 
 #FOLLOWER ACCOUNT INFORMATION
 def getEnterpriseAccounts(*args, **kwargs):
-    timeFilter = kwargs.get('t',"*")
     db_connection = sqlite3.connect('enterprise.db') 
     cursor = db_connection.cursor()
     qry = cursor.execute('''SELECT  id, name, url FROM enterprise_customers''')
@@ -23,6 +22,19 @@ def clearFarms():
     cursor = db_connection.cursor()
     cursor.execute('''DELETE FROM farms''')
     db_connection.commit()
+
+def getFarmsAndEnterprise():
+    db_connection = sqlite3.connect('enterprise.db') 
+    cursor = db_connection.cursor()
+    qry = cursor.execute('''SELECT  enterprise_customers.name, farms.name, farms.mddid FROM farms
+                         join enterprise_customers on enterprise_customers.id = farms.enterpriseid
+                         ''')
+    row =[]
+    for data in qry.fetchall():
+        row.append(data)
+    db_connection.close()
+    return row
+
 
 def getFollowerCountsChart(*args, **kwargs):
     timeFilter = kwargs.get('t',"*")

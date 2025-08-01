@@ -1,2 +1,4 @@
 webdriver-manager
 selenium
+pandas
+openpyxl
