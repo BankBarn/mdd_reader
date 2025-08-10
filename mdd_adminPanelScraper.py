@@ -62,6 +62,8 @@ def companyCrawler(url,id):
             break
     return data_rows
 
+
+
 def main():
     try:
         # Step 1: Open login page
@@ -106,5 +108,6 @@ def main():
 
     finally:
         driver.quit()
+
 
 main()
