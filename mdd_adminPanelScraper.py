@@ -1,5 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import Select
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -62,6 +64,47 @@ def companyCrawler(url,id):
             break
     return data_rows
 
+def impersonateUser():
+    
+    wait = WebDriverWait(driver, 10)
+    driver.get("https://admin.mydairydashboard.com/#/user-management/auth0%7C642dc279d96731e35ad5e6a3")
+    time.sleep(2)
+        #Step 1: Wait for the table to be present
+    impersonateBtn = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/jhi-main/div[2]/div/jhi-user-mgmt-detail/div/button[1]/span[2]")))
+    impersonateBtn.click()
+    time.sleep(2)
+    print("here")
+    driver.switch_to.window(driver.window_handles[1])
+    time.sleep(5)
+    #actions = ActionChains(driver)
+    #actions.move_to_element(element).perform()
+    #driver.find_element(By.CSS_SELECTOR, ".float-none > span:nth-child(2)").click()
+    #element = driver.find_element(By.ID, "CybotCookiebotDialogBodyLevelButtonLevelOptinAllowallSelection")
+    #actions = ActionChains(driver)
+    #actions.move_to_element(element).perform()
+    #element = driver.find_element(By.ID, "CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll")
+    #actions = ActionChains(driver)
+    #actions.move_to_element(element).perform()
+    driver.find_element(By.ID, "CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll").click()
+    time.sleep(5)
+    driver.find_element(By.CSS_SELECTOR, ".pointer-arrow:nth-child(1)").click()
+    driver.execute_script("window.scrollTo(0,0)")
+    driver.find_element(By.CSS_SELECTOR, ".pointer-arrow:nth-child(1)").click()
+    driver.find_element(By.CSS_SELECTOR, "#mat-option-1 .dropdown-name").click()
+    print("looking for Carlson")
+    dropdownMenu = driver.find_element(By.ID, "mat-input-0").click()
+    time.sleep(1)
+    element = driver.find_element(By.XPATH, "//*[text()='CARLSON DAIRY LLP']").click()
+    dropdownMenu = driver.find_element(By.ID, "mat-input-0").click()
+    time.sleep(5)
+    element = driver.find_element(By.XPATH, "//*[text()='SUNSET FARMS INC']").click()
+    time.sleep(5)
+    dropdownMenu = driver.find_element(By.ID, "mat-input-0").click()
+    time.sleep(5)
+    element = driver.find_element(By.XPATH, "//*[text()='Udder Dairy 2']").click()
+    time.sleep(5)
+    time.sleep(10)
+    # Step 2: Grab table rows (excluding header)
 
 
 def main():
@@ -91,11 +134,13 @@ def main():
 
         # Step 6: Wait for successful login and redirect
         time.sleep(2)  # Adjust based on actual page load speed
+        impersonateUser()
+        ''' Off while testing impersonation
         sqlAPI.clearFarms()
         for i in sqlAPI.getEnterpriseAccounts():
             url = str(i[2])
             id = str(i[0])
-            companyCrawler(url, id)
+            companyCrawler(url, id)'''
         '''companyCrawler(pds)
         companyCrawler(gps)
         companyCrawler(elanco)
