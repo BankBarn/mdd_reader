@@ -84,6 +84,9 @@ def impersonateUser():
     time.sleep(1)
     element = driver.find_element(By.XPATH, "//*[text()='CARLSON DAIRY LLP']").click()
     dropdownMenu = driver.find_element(By.ID, "mat-input-0").click()
+    html_source = driver.page_source
+    with open("carlson.html", "w", encoding="utf-8") as f:
+        f.write(html_source)
     time.sleep(5)
     element = driver.find_element(By.XPATH, "//*[text()='SUNSET FARMS INC']").click()
     time.sleep(5)
