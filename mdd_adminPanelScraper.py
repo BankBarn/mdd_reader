@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -8,6 +9,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import sqlAPI
+import os
+import pickle
 
 # --- Configuration ---
 LOGIN_URL = "https://admin.mydairydashboard.com/#/"
@@ -26,6 +29,14 @@ gps = "https://admin.mydairydashboard.com/#/other-company-mdd/13789852"
 elanco = "https://admin.mydairydashboard.com/#/other-company-mdd/33425262"
 vitaplus ="https://admin.mydairydashboard.com/#/other-company-mdd/10641663"
 cargill ="https://admin.mydairydashboard.com/#/other-company-mdd/401013428351"'''
+
+def createDataFolders():
+    for i in sqlAPI.getEnterpriseAccounts():
+        name = str(i[1])
+        data_path = "C:\\programming\\enterprise\\data\\" + name
+        os.makedirs(data_path, exist_ok=True)
+
+createDataFolders()
 
 def companyCrawler(url,id):
     wait = WebDriverWait(driver, 10)
@@ -65,9 +76,8 @@ def companyCrawler(url,id):
     return data_rows
 
 def impersonateUser():
-    
     wait = WebDriverWait(driver, 10)
-    driver.get("https://admin.mydairydashboard.com/#/user-management/auth0%7C642dc279d96731e35ad5e6a3")
+    driver.get("https://admin.mydairydashboard.com/#/user-management/auth0%7C642dc28b2c738b2b12b1b0e9")
     time.sleep(2)
         #Step 1: Wait for the table to be present
     impersonateBtn = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/jhi-main/div[2]/div/jhi-user-mgmt-detail/div/button[1]/span[2]")))
@@ -77,25 +87,30 @@ def impersonateUser():
     #Switch to new tab opened
     driver.switch_to.window(driver.window_handles[1])
     time.sleep(5)
-    driver.find_element(By.ID, "CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll").click()
+    try:
+        driver.find_element(By.ID, "CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll").click()
+    except:
+        print("No Cookie")
     time.sleep(5)
-    print("looking for Carlson")
-    dropdownMenu = driver.find_element(By.ID, "mat-input-0").click()
+    dropdownMenu = driver.find_element(By.ID, "mat-input-0")
+    dropdownMenu.click()
     time.sleep(1)
-    element = driver.find_element(By.XPATH, "//*[text()='CARLSON DAIRY LLP']").click()
-    dropdownMenu = driver.find_element(By.ID, "mat-input-0").click()
-    html_source = driver.page_source
-    with open("carlson.html", "w", encoding="utf-8") as f:
-        f.write(html_source)
-    time.sleep(5)
-    element = driver.find_element(By.XPATH, "//*[text()='SUNSET FARMS INC']").click()
-    time.sleep(5)
-    dropdownMenu = driver.find_element(By.ID, "mat-input-0").click()
-    time.sleep(5)
-    element = driver.find_element(By.XPATH, "//*[text()='Udder Dairy 2']").click()
-    time.sleep(5)
-    time.sleep(10)
-    # Step 2: Grab table rows (excluding header)
+    dropdownMenu.send_keys(Keys.CONTROL, "a")
+    dropdownMenu.send_keys(Keys.DELETE)
+    accounts = sqlAPI.getFarmsForDropdowns(1)
+    accounts[0][0]
+    for account in accounts:
+        #print(account[0])
+        dropdownMenu = driver.find_element(By.ID, "mat-input-0").click()
+        try:
+            element = driver.find_element(By.XPATH, "//*[text()='{}']".format(account[0])).click()
+            page_data = str(driver.page_source)
+            pickle_path =  "C:\\programming\\enterprise\\data\\pds\\" + account[0] +".pickle"
+            with open(pickle_path, 'wb') as file_handle:
+             pickle.dump(page_data, file_handle, protocol=pickle.HIGHEST_PROTOCOL) 
+            time.sleep(5)
+        except:
+            print("Not Found")
 
 
 def main():
@@ -126,19 +141,14 @@ def main():
         # Step 6: Wait for successful login and redirect
         time.sleep(2)  # Adjust based on actual page load speed
         impersonateUser()
-        ''' Off while testing impersonation
-        sqlAPI.clearFarms()
+        #Off while testing impersonation
+        '''sqlAPI.clearFarms()
         for i in sqlAPI.getEnterpriseAccounts():
             url = str(i[2])
             id = str(i[0])
             companyCrawler(url, id)'''
-        '''companyCrawler(pds)
-        companyCrawler(gps)
-        companyCrawler(elanco)
-        companyCrawler(vitaplus)
-        companyCrawler(cargill)'''
-        
 
+        
     except Exception as e:
         print("An error occurred:", e)
 
