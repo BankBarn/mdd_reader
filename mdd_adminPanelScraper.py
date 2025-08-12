@@ -75,9 +75,9 @@ def companyCrawler(url,id):
             break
     return data_rows
 
-def impersonateUser():
+def impersonateUser(enterprise, account_url, enterprise_id):
     wait = WebDriverWait(driver, 10)
-    driver.get("https://admin.mydairydashboard.com/#/user-management/auth0%7C642dc28b2c738b2b12b1b0e9")
+    driver.get(account_url)
     time.sleep(2)
         #Step 1: Wait for the table to be present
     impersonateBtn = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/jhi-main/div[2]/div/jhi-user-mgmt-detail/div/button[1]/span[2]")))
@@ -95,22 +95,25 @@ def impersonateUser():
     dropdownMenu = driver.find_element(By.ID, "mat-input-0")
     dropdownMenu.click()
     time.sleep(1)
+    #this resets the dropdown to look at the first account in the list incase it is at the bottom
     dropdownMenu.send_keys(Keys.CONTROL, "a")
     dropdownMenu.send_keys(Keys.DELETE)
-    accounts = sqlAPI.getFarmsForDropdowns(1)
+    accounts = sqlAPI.getFarmsForDropdowns(enterprise_id)
     accounts[0][0]
     for account in accounts:
         #print(account[0])
         dropdownMenu = driver.find_element(By.ID, "mat-input-0").click()
         try:
             element = driver.find_element(By.XPATH, "//*[text()='{}']".format(account[0])).click()
+            time.sleep(5)
             page_data = str(driver.page_source)
-            pickle_path =  "C:\\programming\\enterprise\\data\\pds\\" + account[0] +".pickle"
+            pickle_path =  "C:\\programming\\enterprise\\data\\" + enterprise + "\\" + account[0] +".pickle"
             with open(pickle_path, 'wb') as file_handle:
              pickle.dump(page_data, file_handle, protocol=pickle.HIGHEST_PROTOCOL) 
-            time.sleep(5)
         except:
             print("Not Found")
+    driver.close()
+    driver.switch_to.window(driver.window_handles[0])
 
 
 def main():
@@ -140,13 +143,18 @@ def main():
 
         # Step 6: Wait for successful login and redirect
         time.sleep(2)  # Adjust based on actual page load speed
-        impersonateUser()
-        #Off while testing impersonation
-        '''sqlAPI.clearFarms()
+        sqlAPI.clearFarms()
         for i in sqlAPI.getEnterpriseAccounts():
             url = str(i[2])
             id = str(i[0])
-            companyCrawler(url, id)'''
+            companyCrawler(url, id)
+        for i in sqlAPI.getEnterpriseImpersonationAccountInfo():
+            enterprise_name = i[0]
+            enterprise_account_url = i[1]
+            enterprise_id = i[2]
+            impersonateUser(enterprise_name, enterprise_account_url, enterprise_id)
+        #Off while testing impersonation
+
 
         
     except Exception as e:
