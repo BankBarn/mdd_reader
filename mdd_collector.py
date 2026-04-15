@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import traceback
+import sqlAPI
 
 from selenium import webdriver
 from selenium.common.exceptions import StaleElementReferenceException
@@ -18,6 +19,59 @@ MDD_APP_EMAIL = os.environ.get("MDD_APP_EMAIL", "spadedata@spade.ag")
 MDD_APP_PASSWORD = os.environ.get("MDD_APP_PASSWORD", "Sp@de2025!==")
 
 STRICT_MENU_ITEM_CSS = "button.mat-mdc-menu-item, a.mat-mdc-menu-item"
+
+
+def _mat_menu_item_xpath_by_visible_text(panel_id: str, label: str) -> str:
+    """XPath for a Material menu row under #panel_id whose text contains `label` (e.g. Download CSV)."""
+    if '"' in label:
+        raise ValueError(
+            "MDD_DOWNLOAD_MENU_TEXT must not contain double quotes (XPath string limitation)."
+        )
+    return (
+        f"//div[@id='{panel_id}']//*[self::button or self::a]"
+        f"[contains(@class,'mat-mdc-menu-item')]"
+        f'[contains(normalize-space(.), "{label}")]'
+    )
+
+
+def _mat_menu_item_xpath_any_open_panel(label: str) -> str:
+    """XPath for menu rows under any .mat-mdc-menu-panel (overlay panel id changes each open)."""
+    if '"' in label:
+        raise ValueError(
+            "MDD_DOWNLOAD_MENU_TEXT must not contain double quotes (XPath string limitation)."
+        )
+    return (
+        "//div[contains(@class,'mat-mdc-menu-panel')]"
+        "//*[self::button or self::a][contains(@class,'mat-mdc-menu-item')]"
+        f'[contains(normalize-space(.), "{label}")]'
+    )
+
+
+def _wait_visible_mat_menu_item(driver, wait: WebDriverWait, label: str, panel_id: str | None):
+    """
+    Return a displayed, enabled menu item. Angular gives each overlay a new id (mat-menu-panel-3,
+    mat-menu-panel-4, ...), so prefer panel_id=None to scan any open panel and pick the visible row.
+    """
+    if '"' in label:
+        raise ValueError(
+            "MDD_DOWNLOAD_MENU_TEXT must not contain double quotes (XPath string limitation)."
+        )
+
+    def _visible_row(drv):
+        xpath = (
+            _mat_menu_item_xpath_by_visible_text(panel_id, label)
+            if panel_id
+            else _mat_menu_item_xpath_any_open_panel(label)
+        )
+        for el in drv.find_elements(By.XPATH, xpath):
+            try:
+                if el.is_displayed() and el.is_enabled():
+                    return el
+            except StaleElementReferenceException:
+                continue
+        return False
+
+    return wait.until(_visible_row)
 
 
 def _debug_enabled() -> bool:
@@ -169,6 +223,25 @@ def _list_download_names(directory: str) -> set[str]:
         return set()
 
 
+def _is_chrome_partial_download_filename(name: str) -> bool:
+    """True while Chrome is still writing (e.g. *.crdownload, including macOS names)."""
+    return name.lower().endswith(".crdownload")
+
+
+def _dismiss_blocking_overlays(driver, max_attempts: int = 12) -> None:
+    """Close Material/CDK overlays (menus, backdrops) so the next click hits the page."""
+    body = driver.find_element(By.TAG_NAME, "body")
+    for _ in range(max_attempts):
+        backdrops = driver.find_elements(
+            By.CSS_SELECTOR,
+            "div.cdk-overlay-backdrop.cdk-overlay-backdrop-showing",
+        )
+        if not any(b.is_displayed() for b in backdrops):
+            return
+        body.send_keys(Keys.ESCAPE)
+        time.sleep(0.25)
+
+
 def _wait_for_chrome_download(
     download_dir: str,
     before: set[str],
@@ -186,15 +259,16 @@ def _wait_for_chrome_download(
             time.sleep(0.2)
             continue
 
-        partial = [n for n in names if n.endswith(".crdownload")]
-        if partial and _debug_enabled():
-            now = time.monotonic()
-            if now - last_partial_log > 2.0:
-                print(
-                    f"[MDD debug] Download in progress: partial={partial!r}",
-                    flush=True,
-                )
-                last_partial_log = now
+        partial = [n for n in names if _is_chrome_partial_download_filename(n)]
+        if partial:
+            if _debug_enabled():
+                now = time.monotonic()
+                if now - last_partial_log > 2.0:
+                    print(
+                        f"[MDD debug] Download in progress: partial={partial!r}",
+                        flush=True,
+                    )
+                    last_partial_log = now
             time.sleep(0.2)
             continue
 
@@ -205,6 +279,8 @@ def _wait_for_chrome_download(
 
         ready: list[str] = []
         for n in new_names:
+            if _is_chrome_partial_download_filename(n):
+                continue
             path = os.path.join(download_dir, n)
             try:
                 if os.path.isfile(path) and os.path.getsize(path) > 0:
@@ -250,7 +326,7 @@ class mdd_reader:
         if getattr(self, "driver", None):
             self.driver.quit()
 
-    def test_newTest(self):
+    def mdd_login(self):
         # Navigate to login page
         _debug_step(1, "Load login page", "GET app.mydairydashboard.com/login")
         self.driver.get("https://app.mydairydashboard.com/login")
@@ -292,92 +368,121 @@ class mdd_reader:
         self.driver.find_element(By.ID, "password").send_keys(Keys.ENTER)
         _debug_step(5, "Password", "submitted #password")
 
-        # Wait for dashboard to load and click column header
-        WebDriverWait(self.driver, 10).until(
-            expected_conditions.visibility_of_element_located(
-                (
-                    By.CSS_SELECTOR,
-                    ".mat-mdc-header-row > .cdk-column-id_weight_pound:nth-child(3)",
-                )
-            )
-        )
-        self.driver.find_element(
-            By.CSS_SELECTOR,
-            ".mat-mdc-header-row > .cdk-column-id_weight_pound:nth-child(3)",
-        ).click()
-        _debug_step(
-            6,
-            "Weight column header",
-            "clicked .cdk-column-id_weight_pound (sort/header)",
-        )
-
-        # Scroll to top (matches legacy mdd_collector.py)
-        self.driver.execute_script("window.scrollTo(0,0)")
-        _debug_step(7, "Scroll", "window.scrollTo(0,0)")
-
-        # Legacy Selenium IDE flow from mdd_collector.py — same selectors/XPath as before.
-        wait = WebDriverWait(self.driver, 15)
-        trigger_css = ".mat-mdc-menu-trigger:nth-child(1)"
-        element = wait.until(
-            expected_conditions.presence_of_element_located(
-                (By.CSS_SELECTOR, trigger_css)
-            )
-        )
-        _debug_step(8, "Menu trigger", trigger_css)
-        actions = ActionChains(self.driver)
-        actions.move_to_element(element).perform()
-        self.driver.find_element(By.CSS_SELECTOR, trigger_css).click()
-        _debug_step(9, "Menu trigger", "clicked")
-
-        panel_id = os.environ.get("MDD_MENU_PANEL_ID", "mat-menu-panel-3")
-        menu_item_xpath = (
-            f"(//div[@id='{panel_id}']/div/button[2]/span)[1]"
-        )
-        wait.until(
-            expected_conditions.element_to_be_clickable(
-                (By.XPATH, menu_item_xpath)
-            )
-        )
-        before_downloads = _list_download_names(self.download_dir)
-        self.driver.find_element(By.XPATH, menu_item_xpath).click()
-        _debug_step(10, "Menu 2nd option", menu_item_xpath)
-
-        # Keep the browser session until Chrome finishes saving the file (avoids quit() mid-download).
-        wait_sec = float(os.environ.get("MDD_DOWNLOAD_WAIT_SEC", "120"))
-        grace = float(os.environ.get("MDD_DOWNLOAD_GRACE_SEC", "2"))
-        if wait_sec > 0:
-            _debug_step(
-                11,
-                "Waiting for download",
-                f"dir={self.download_dir!r} timeout={wait_sec}s",
-            )
+    def dashboard_load(self, processor):
+        url = "https://app.mydairydashboard.com/dashboards/" + processor[1]
+        self.driver.get(url)
+        time.sleep(5)
+        for farm in sqlAPI.get_farm_info_for_processor(processor[0]):
+            print(farm[0])
+            _dismiss_blocking_overlays(self.driver)
+            dropdownMenu = self.driver.find_element(By.ID, "mat-input-0")
+            dropdownMenu.click()
+            time.sleep(1)
+            #this resets the dropdown to look at the first account in the list incase it is at the bottom
+            dropdownMenu.send_keys(Keys.CONTROL, "a")
+            dropdownMenu.send_keys(Keys.DELETE)
+            # Wait for dashboard to load and click column header
+            self.driver.find_element(By.ID, "mat-input-0").click()
             try:
-                finished = _wait_for_chrome_download(
-                    self.download_dir,
-                    before_downloads,
-                    timeout_sec=wait_sec,
-                    grace_sec=grace,
+                element = self.driver.find_element(By.XPATH, "//*[text()='{}']".format(farm[0])).click()
+                time.sleep(5)
+                print("Not Found")
+            except:
+                print("Farm not found")
+            WebDriverWait(self.driver, 10).until(
+                expected_conditions.visibility_of_element_located(
+                    (
+                        By.CSS_SELECTOR,
+                        ".mat-mdc-header-row > .cdk-column-id_weight_pound:nth-child(3)",
+                    )
                 )
-            except TimeoutError as e:
-                print(str(e), file=sys.stderr)
-                raise
-            print(
-                f"Download finished ({len(finished)} file(s)): {finished}",
-                flush=True,
             )
-        else:
+            self.driver.find_element(
+                By.CSS_SELECTOR,
+                ".mat-mdc-header-row > .cdk-column-id_weight_pound:nth-child(3)",
+            ).click()
             _debug_step(
-                11,
-                "Download wait skipped",
-                "MDD_DOWNLOAD_WAIT_SEC<=0",
+                6,
+                "Weight column header",
+                "clicked .cdk-column-id_weight_pound (sort/header)",
             )
+
+            # Scroll to top (matches legacy mdd_collector.py)
+            self.driver.execute_script("window.scrollTo(0,0)")
+            _debug_step(7, "Scroll", "window.scrollTo(0,0)")
+
+            # Legacy Selenium IDE flow from mdd_collector.py — same selectors/XPath as before.
+            wait = WebDriverWait(self.driver, 15)
+            trigger_css = ".mat-mdc-menu-trigger:nth-child(1)"
+            element = wait.until(
+                expected_conditions.presence_of_element_located(
+                    (By.CSS_SELECTOR, trigger_css)
+                )
+            )
+            _debug_step(8, "Menu trigger", trigger_css)
+            actions = ActionChains(self.driver)
+            actions.move_to_element(element).perform()
+            self.driver.find_element(By.CSS_SELECTOR, trigger_css).click()
+            _debug_step(9, "Menu trigger", "clicked")
+            time.sleep(1)
+            # Empty/unset MDD_MENU_PANEL_ID: find the visible row (panel #id changes every open).
+            panel_id_raw = os.environ.get("MDD_MENU_PANEL_ID", "").strip()
+            panel_id = panel_id_raw or None
+            menu_label = os.environ.get("MDD_DOWNLOAD_MENU_TEXT", "Download CSV")
+            menu_item = _wait_visible_mat_menu_item(
+                self.driver, wait, menu_label, panel_id
+            )
+            before_downloads = _list_download_names(self.download_dir)
+            menu_item.click()
+            loc = (
+                f"panel_id={panel_id_raw!r} label={menu_label!r}"
+                if panel_id
+                else f"any open mat-mdc-menu-panel label={menu_label!r}"
+            )
+            _debug_step(10, "Menu item by label", loc)
+
+            # Keep the browser session until Chrome finishes saving the file (avoids quit() mid-download).
+            wait_sec = float(os.environ.get("MDD_DOWNLOAD_WAIT_SEC", "120"))
+            grace = float(os.environ.get("MDD_DOWNLOAD_GRACE_SEC", "2"))
+            if wait_sec > 0:
+                _debug_step(
+                    11,
+                    "Waiting for download",
+                    f"dir={self.download_dir!r} timeout={wait_sec}s",
+                )
+                try:
+                    finished = _wait_for_chrome_download(
+                        self.download_dir,
+                        before_downloads,
+                        timeout_sec=wait_sec,
+                        grace_sec=grace,
+                    )
+                    self.driver.get(url)
+                    time.sleep(5)
+                except TimeoutError as e:
+                    print(str(e), file=sys.stderr)
+                    raise
+                print(
+                    f"Download finished ({len(finished)} file(s)): {finished}",
+                    flush=True,
+                )
+                _dismiss_blocking_overlays(self.driver)
+            else:
+                _debug_step(
+                    11,
+                    "Download wait skipped",
+                    "MDD_DOWNLOAD_WAIT_SEC<=0",
+                )
+                _dismiss_blocking_overlays(self.driver)
 
 
 def main():
     reader = mdd_reader()
     reader.setup_method(None)
     try:
-        reader.test_newTest()
+        reader.mdd_login()
+        for processor in sqlAPI.list_of_processors():
+            reader.dashboard_load(processor)
     finally:
         reader.teardown_method(None)
 
