@@ -1,28 +1,31 @@
 # mdd_reader — documentation
 
-This folder contains the canonical documentation for the **mdd_reader** repository: tooling used to pull structured information from the **My Dairy Dashboard (MDD)** ecosystem, primarily via the **MyDairy admin portal** (`admin.mydairydashboard.com`).
+This document describes the **active** pieces of this repository:
 
-For a product- and architecture-oriented summary, see [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md). For AI-assisted development context, see [prompt.md](./prompt.md).
-
----
-
-## What this repository does
-
-| Component | Role |
-|-----------|------|
-| `mdd_adminPanelScraper.py` | Selenium automation: admin login, per-enterprise “company” table crawl, farm rows written to SQLite, then user impersonation and per-farm dashboard HTML saved as pickle files. |
-| `sqlAPI.py` | SQLite access layer for `enterprise.db` (enterprises, farms, impersonation URLs). |
-| `data-reader.py` | Parses saved or sample HTML to extract **indicator card** content (title, body, footer) using BeautifulSoup. |
-| `excel-file-maker.py` | Thin script that prints joined enterprise/farm rows from the database (intended for export or inspection). |
-| `install.txt` | Python package list for a minimal environment (see [Setup](#setup)). |
+| Artifact | Role |
+|----------|------|
+| [`install.txt`](../install.txt) | Python packages to run the collector (`pip install -r install.txt`). |
+| [`mdd_collector.py`](../mdd_collector.py) | Selenium + Chrome: logs into **app.mydairydashboard.com**, opens each processor dashboard from the DB, selects each farm, and downloads CSV via the column header menu (“Download CSV”). |
+| [`sqlAPI.py`](../sqlAPI.py) | Reads **`mdd.db`**: lists processors (dashboards) and farm names per processor. |
+| [`mdd.db`](../mdd.db) | SQLite database: `dashboards` and `farms` (see below). |
 
 ---
 
 ## Prerequisites
 
 - **Python 3.x**
-- **Google Chrome** (for Selenium + ChromeDriver via `webdriver-manager`)
-- A populated **`enterprise.db`** with tables and rows the code expects (`enterprise_customers`, `enterprise_user`, `farms`, etc.). The repository does not ship a schema migration or seed file; the database is assumed to exist locally.
+- **Google Chrome** (ChromeDriver is resolved via `webdriver-manager`)
+
+---
+
+## Database (`mdd.db`)
+
+Expected tables (see `sqlite3 mdd.db '.schema'` if you need the live schema):
+
+- **`dashboards`** — at least `id`, `url` (and `processor_name` in the current schema). Each row is one “processor” dashboard the script visits (`https://app.mydairydashboard.com/dashboards/<url>`).
+- **`farms`** — `farm_name`, `processor_id` (links farms to `dashboards.id`).
+
+Populate or migrate this file yourself; the repo does not ship a seed script.
 
 ---
 
@@ -32,74 +35,60 @@ For a product- and architecture-oriented summary, see [PROJECT_OVERVIEW.md](./PR
 
    ```bash
    pip install -r install.txt
-   pip install beautifulsoup4
    ```
 
-   `data-reader.py` requires **BeautifulSoup** (`bs4`); it is not listed in `install.txt` today.
+2. **Credentials**: set **`MDD_APP_EMAIL`** and **`MDD_APP_PASSWORD`** in the environment. Do not rely on defaults in source for anything shared or public.
 
-2. **Credentials and paths**: `mdd_adminPanelScraper.py` is written for a specific machine layout and contains admin portal login settings. Before running anything, configure login and output paths via **environment variables** or a local config file that is **gitignored** — do not commit secrets. Rotate any credentials that were ever committed to version control.
+3. Place **`mdd.db`** in the project root (or change the path in `sqlAPI.py`).
 
-3. Place or generate **`enterprise.db`** in the project root (or adjust connection paths in `sqlAPI.py`).
-
-4. Optional: for `data-reader.py`, provide a sample HTML file (e.g. exported dashboard markup) as referenced in that script, or change the input path.
+4. Optional directories and tuning (see [Environment variables](#environment-variables)).
 
 ---
 
-## Running the pieces
+## Run
 
-- **Admin scraper** (long-running; drives a real browser):
+```bash
+python mdd_collector.py
+```
 
-  ```bash
-  python mdd_adminPanelScraper.py
-  ```
-
-  Expects Windows-style absolute paths in the current code for data directories; adjust for your OS or use configurable base paths.
-
-- **HTML card extraction** (offline parsing):
-
-  ```bash
-  python data-reader.py
-  ```
-
-- **List farms and enterprises**:
-
-  ```bash
-  python excel-file-maker.py
-  ```
+Flow: one browser session → login → for each row in `dashboards`, load that dashboard URL → for each farm name for that processor, select the farm, open the weight column menu, click the menu row whose text matches **`MDD_DOWNLOAD_MENU_TEXT`** (default `Download CSV`) → wait for the file under the download directory → repeat.
 
 ---
 
-## Data and outputs
+## Environment variables
 
-- **SQLite (`enterprise.db`)**: Stores enterprise metadata, farm names, and MDD identifiers; the scraper refreshes the `farms` table during a run (`clearFarms` then repopulates from portal tables).
-- **Pickle files**: Full-page HTML (`page_source`) per farm account, written under a configurable enterprise data directory for later parsing (e.g. with `data-reader.py` patterns).
+| Variable | Purpose |
+|----------|---------|
+| `MDD_APP_EMAIL` | Login email for app.mydairydashboard.com |
+| `MDD_APP_PASSWORD` | Login password |
+| `MDD_DEBUG` | `1` / `true` / `yes` — extra step logging |
+| `MDD_DOWNLOAD_DIR` | Chrome download folder (default: `./mdd_downloads`) |
+| `MDD_DOWNLOAD_WAIT_SEC` | Max seconds to wait for a finished download (default `120`; `<=0` skips wait) |
+| `MDD_DOWNLOAD_GRACE_SEC` | Extra sleep after a file appears (default `2`) |
+| `MDD_DOWNLOAD_MENU_TEXT` | Substring to find on the menu item (default `Download CSV`) |
+| `MDD_MENU_PANEL_ID` | If set, scope the menu to that overlay panel id; if empty, the script finds the **visible** item in any open Material menu (recommended when panel ids change each open) |
+| `MDD_SAVE_FAILURE_ARTIFACTS` | With debug-like values, save menu failure screenshot/HTML (see `mdd_collector.py`) |
+| `MDD_FAILURE_PREFIX` | Prefix for failure artifact filenames |
 
 ---
 
 ## Security
 
-- Treat admin portal credentials like production secrets: use environment variables or a secret manager, and remove hardcoded passwords from source before sharing or publishing the repo.
-- The SQLite helpers use string formatting for SQL in places; prefer parameterized queries when extending this code to avoid injection issues.
+- Treat app credentials as secrets; use environment variables, not committed defaults, for shared copies of the repo.
+- `sqlAPI.py` builds one query with `.format(processor_id)` for farm lookup; prefer parameterized queries if you extend it.
 
 ---
 
-## Repository map
+## Repository map (in scope)
 
 ```
 mdd_reader/
-├── data-reader.py          # HTML → structured card fields
-├── mdd_adminPanelScraper.py
-├── sqlAPI.py
-├── excel-file-maker.py
 ├── install.txt
+├── mdd_collector.py
+├── sqlAPI.py
+├── mdd.db
 └── docs/
     ├── README.md           # this file
     ├── PROJECT_OVERVIEW.md
     └── prompt.md
 ```
-
----
-
-## Contributing / next steps
-
-See [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md) for known gaps and suggested improvements. When adding features, update this README and [prompt.md](./prompt.md) so automation and future contributors stay aligned.

@@ -1,75 +1,34 @@
 # AI development prompt — mdd_reader
 
-Use this file as **system or project context** when asking an AI assistant to modify or extend the **mdd_reader** codebase. Paste or attach it at the start of a session, or store it as a Cursor rule for this repository.
+Use this file as **project context** when modifying automation for **My Dairy Dashboard** in this repository.
+
+**In scope:** only **`install.txt`**, **`mdd_collector.py`**, **`sqlAPI.py`**, and **`mdd.db`**. Ignore legacy or archived scripts unless the user explicitly expands scope.
 
 ---
 
-## Project identity
+## What the project does
 
-**mdd_reader** is a small Python toolkit for extracting information from the **My Dairy Dashboard** ecosystem:
-
-- **Live automation** (`mdd_adminPanelScraper.py`): Selenium + Chrome logs into **`https://admin.mydairydashboard.com`**, walks **enterprise “other company”** pages to read **farm tables**, persists rows to **SQLite** (`enterprise.db`), then **impersonates** users and saves each farm’s **full page HTML** as a **pickle** under per-enterprise directories.
-- **Offline parsing** (`data-reader.py`): Uses **BeautifulSoup** to extract **indicator card** fields from dashboard HTML: `.card-title`, `.mdd-indicator-container`, `.mdd-highcharts-footer`, scoped to `.card-container` or `mdd-indicator-card`.
-- **Data access** (`sqlAPI.py`): CRUD-style helpers for `enterprise.db` — enterprises, farms, impersonation URLs, `clearFarms`, etc.
-
-Supporting scripts: `excel-file-maker.py` prints joined enterprise/farm rows from the DB.
+- **`mdd_collector.py`**: Selenium + Chrome — login to **app.mydairydashboard.com**, iterate processors and farms from the database, trigger **Download CSV** (or **`MDD_DOWNLOAD_MENU_TEXT`**) from the dashboard column menu, save files to a download directory.
+- **`sqlAPI.py`**: SQLite reads against **`mdd.db`** — `list_of_processors()`, `get_farm_info_for_processor(id)`.
+- **`mdd.db`**: Tables **`dashboards`** and **`farms`** (processor list + farm names per processor).
+- **`install.txt`**: Lists **`selenium`** and **`webdriver-manager`** for `pip install -r install.txt`.
 
 ---
 
 ## Constraints for AI-generated changes
 
-1. **Never add or preserve real passwords, API keys, or PII** in source code or docs. Use placeholders and environment variables.
-2. **Prefer minimal diffs** that match existing style (imports, naming, no unnecessary abstractions).
-3. **SQL**: Use parameterized queries (`?` placeholders) when touching `sqlAPI.py`; do not add more string-formatted SQL.
-4. **Selenium**: Prefer explicit waits (`WebDriverWait`) over long fixed `sleep` where you touch that code; keep behavior equivalent unless asked to refactor broadly.
-5. **Paths**: Do not assume Windows `C:\` paths; use configurable base directory via env var or function argument when adding new code.
-6. **Dependencies**: If you add imports, update **`requirements.txt`** or **`install.txt`** consistently (the project currently lists packages in `install.txt`).
+1. **Secrets**: Do not add or preserve real passwords in source. Prefer **`MDD_APP_EMAIL`** / **`MDD_APP_PASSWORD`** and document them in **`docs/README.md`** only as variable names.
+2. **Minimal diffs**: Match existing style in **`mdd_collector.py`** and **`sqlAPI.py`**.
+3. **SQL**: Prefer parameterized queries (`?`) in **`sqlAPI.py`** when changing queries.
+4. **Selenium**: Prefer **`WebDriverWait`** and existing helpers (`_wait_visible_mat_menu_item`, `_dismiss_blocking_overlays`) over new long sleeps unless necessary.
+5. **Dependencies**: New imports require updating **`install.txt`**.
 
 ---
 
-## Key files and responsibilities
+## Documentation
 
-| File | Responsibility |
-|------|------------------|
-| `mdd_adminPanelScraper.py` | Browser session, login flow, `companyCrawler`, `impersonateUser`, pickle writes. |
-| `sqlAPI.py` | SQLite: `addFarm`, `clearFarms`, `getEnterpriseAccounts`, `getFarmsForDropdowns`, `getEnterpriseImpersonationAccountInfo`, `getFarmsAndEnterprise`. |
-| `data-reader.py` | `extract_card_bits(html) -> list[dict]` with keys `title`, `data`, `footer`. |
-| `excel-file-maker.py` | Iterates `getFarmsAndEnterprise()` for output. |
-
----
-
-## Domain vocabulary
-
-- **Enterprise / company**: A customer org in the admin portal; has a detail URL and a list of farms.
-- **Farm account**: Row in the admin table + selectable entry in the impersonated dashboard dropdown.
-- **Indicator card**: Dashboard widget; parsed fields map to marketing/ops KPIs and chart footers (e.g. “4-day avg on …”).
-
----
-
-## Known technical debt (do not “fix” unless requested)
-
-- Absolute XPath selectors and pagination via link text.
-- `install.txt` missing `beautifulsoup4`.
-- `data-reader.py` reads a local HTML filename that may not exist in-repo.
-- Legacy string formatting in some SQL in `sqlAPI.py`.
-
-When fixing debt, do so in **focused PR-sized steps** and update **`docs/README.md`** if behavior or setup changes.
-
----
-
-## Typical extension tasks
-
-- **Add JSON export** next to pickle dumps for downstream ETL.
-- **Harden parsers** for additional card types or empty states.
-- **Add CLI arguments** for dry-run, single-enterprise, or single-farm runs.
-- **Add tests** for `extract_card_bits` using committed **sanitized** HTML fixtures (no real farm names if sensitive).
-
----
-
-## Documentation map
-
-- **`docs/README.md`** — setup, run commands, security notes.
-- **`docs/PROJECT_OVERVIEW.md`** — product context, data flow, risks, roadmap.
+- **`docs/README.md`** — setup, run, environment variables, **`mdd.db`** shape.
+- **`docs/PROJECT_OVERVIEW.md`** — flow diagram, risks.
 - **`docs/prompt.md`** — this file.
 
-When introducing new modules or workflows, update the relevant doc(s) in **`docs/`** in the same change.
+Update the relevant doc when behavior or setup changes.

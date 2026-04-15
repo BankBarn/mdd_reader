@@ -1,135 +1,80 @@
 # Project overview — mdd_reader
 
-**Document type:** product and technical overview  
-**Audience:** engineers, analysts, and stakeholders integrating with My Dairy Dashboard (MDD) data
+**Scope:** This overview applies only to **`install.txt`**, **`mdd_collector.py`**, **`sqlAPI.py`**, and **`mdd.db`**.
+
+**Audience:** anyone running or extending the My Dairy Dashboard CSV download automation.
 
 ---
 
-## Problem statement
+## Problem
 
-Organizations that support dairy operations often rely on **My Dairy Dashboard** for operational and performance metrics. The **admin portal** exposes enterprise-level configuration, farm rosters, and the ability to act as (impersonate) end users to view their dashboards. Manually copying that information is slow and error-prone.
-
-**mdd_reader** exists to **automate collection** of:
-
-1. **Farm rosters** per enterprise (identifiers and names as shown in admin tables).
-2. **Dashboard HTML snapshots** per farm account after impersonation, for downstream parsing of indicator cards and metrics.
-
-A secondary path parses **static HTML** into structured **card titles, body text, and footers** (e.g. chart subtitles such as rolling averages), which matches how the live dashboard surfaces KPIs.
+My Dairy Dashboard exposes per-farm data in the web app. Copying CSVs manually for many farms and processors is slow. **mdd_reader** automates login, navigation, and CSV download using the same UI a user would.
 
 ---
 
-## Target users and use cases
+## What runs today
 
-| User | Use case |
-|------|----------|
-| Internal data / integration team | Refresh a local catalog of enterprises and farms from the admin UI. |
-| Analytics / reporting | Feed parsed card text and footers into spreadsheets, databases, or BI tools. |
-| Engineering | Extend Selenium flows when the portal DOM or auth flow changes. |
+1. **`sqlAPI.list_of_processors()`** reads **`dashboards`** in **`mdd.db`** and returns `(id, url)` rows.
+2. **`mdd_collector.py`** logs into **https://app.mydairydashboard.com**, then for each processor builds  
+   `https://app.mydairydashboard.com/dashboards/<url>`.
+3. For each farm name from **`sqlAPI.get_farm_info_for_processor(processor_id)`** ( **`farms`** table ), the script selects that farm in the Material autocomplete, opens the weight column header menu, and clicks the menu item whose label matches **`MDD_DOWNLOAD_MENU_TEXT`** (default **Download CSV**).
+4. Chrome saves files under **`MDD_DOWNLOAD_DIR`** (default **`mdd_downloads`**). The script waits until Chrome finishes (no `*.crdownload`).
 
 ---
 
-## System context (conceptual)
+## System context
 
 ```mermaid
 flowchart LR
-  subgraph portal [MyDairy Admin Portal]
-    Login[Login]
-    Tables[Enterprise farm tables]
-    Impersonate[User impersonation]
-    Dash[End-user dashboard HTML]
+  subgraph app [My Dairy Dashboard]
+    Login[app.mydairydashboard.com login]
+    Dash[Per-processor dashboard]
+    CSV[CSV download]
   end
-  subgraph local [mdd_reader]
-    Selenium[Selenium scraper]
-    DB[(enterprise.db)]
-    Pickles[Per-farm HTML pickles]
-    Parser[data-reader BeautifulSoup]
+  subgraph local [Repository]
+    Py[mdd_collector.py]
+    API[sqlAPI.py]
+    DB[(mdd.db)]
+    Files[Download folder]
   end
-  Login --> Selenium
-  Selenium --> Tables
-  Tables --> DB
-  Selenium --> Impersonate
-  Impersonate --> Dash
-  Dash --> Pickles
-  Pickles --> Parser
+  DB --> API
+  API --> Py
+  Py --> Login
+  Login --> Dash
+  Dash --> CSV
+  CSV --> Files
 ```
 
 ---
 
-## Information gathered today
+## Data store (`mdd.db`)
 
-### From admin “company” pages (`companyCrawler`)
+| Table | Used for |
+|-------|----------|
+| `dashboards` | Processor id and URL segment for `/dashboards/<url>`. |
+| `farms` | Farm names keyed by `processor_id` for the dropdown loop. |
 
-- Table rows from the enterprise detail view: cells are interpreted as **farm name** and **MDD-related identifier** (second column), then stored via `sqlAPI.addFarm(enterpriseID, mddid, farmName)`.
-- Pagination is handled by clicking a “next” control until disabled or the flow exits.
-
-### From impersonation (`impersonateUser`)
-
-- For each enterprise, opens the **user management** URL from the database, clicks **impersonate**, switches to the new tab, accepts cookies when present, and selects each farm from a **Material dropdown** (`mat-input-0`).
-- For each selection, saves **`driver.page_source`** to a **pickle** file named after the farm under an enterprise-specific folder.
-
-### From offline HTML (`extract_card_bits` in `data-reader.py`)
-
-- **Card title** (`.card-title`)
-- **Indicator body** (`.mdd-indicator-container`)
-- **Chart/footer line** (`.mdd-highcharts-footer`), e.g. period labels
-
-Selectors assume DOM structure using `.card-container` or `mdd-indicator-card` hosts, consistent with the MyDairy dashboard front end.
-
----
-
-## Data stores
-
-| Store | Purpose |
-|-------|---------|
-| `enterprise.db` | Source of truth for enterprise names, admin URLs, impersonation user URLs, and the farm list keyed by enterprise. |
-| Pickle files | Opaque snapshots of HTML for replay parsing without hitting the portal again. |
-
-**Note:** The repo does not include a checked-in schema or ERD; the implied tables include `enterprise_customers`, `enterprise_user`, and `farms`.
+The exact column list may evolve; align **`sqlAPI.py`** queries with your schema.
 
 ---
 
 ## Strengths
 
-- Clear separation between **browser automation**, **SQLite access**, and **HTML parsing**.
-- Card extraction is scoped to **per-card** DOM subtrees, which reduces noise from the rest of the page.
-- **webdriver-manager** reduces manual ChromeDriver maintenance.
+- **webdriver-manager** reduces manual ChromeDriver setup.
+- Menu actions target **visible** Material menu rows by label, avoiding a single hard-coded overlay panel id when **`MDD_MENU_PANEL_ID`** is unset.
+- Download wait ignores in-progress **`*.crdownload`** files so completion is detected reliably.
 
 ---
 
 ## Risks and limitations
 
-1. **Fragile selectors**: Heavy use of absolute XPath and link text (`»`, `1`) breaks when the SPA layout changes.
-2. **Environment coupling**: Hardcoded OS paths and inline credentials make the project non-portable and unsafe for shared repos until refactored.
-3. **SQL construction**: String interpolation in SQL helpers is a maintenance and security risk; parameterized queries are preferred.
-4. **Dependency drift**: `install.txt` omits `beautifulsoup4` though `data-reader.py` imports it.
-5. **Missing sample assets**: `data-reader.py` references a local HTML file that is not in the repository; new contributors need a sample or instructions to export HTML from the browser.
+- **DOM coupling**: Selectors (Material classes, `#mat-input-0`, column header CSS) can break when the app updates.
+- **SQL in `sqlAPI.py`**: Farm lookup uses string formatting for the id; parameterized SQL is safer when extending.
+- **Timing**: Some steps still use fixed sleeps; flaky networks or slow renders may need longer waits or explicit conditions.
 
 ---
 
-## Suggested roadmap (prioritized)
+## Related documentation
 
-1. **Secrets and config**: Move login, base URLs, and filesystem roots to environment variables or a ignored config module; document required variables in `README.md`.
-2. **Dependencies**: Replace `install.txt` with `requirements.txt` (pinned versions) including `beautifulsoup4`.
-3. **Stability**: Replace brittle XPath with stable `data-testid` or role-based selectors if the app provides them; add explicit waits tied to visible table rows.
-4. **Safety**: Parameterize all SQL in `sqlAPI.py`.
-5. **Testing**: Add a **fixture HTML** file and unit tests for `extract_card_bits`.
-6. **Output format**: Optionally write JSON or Parquet alongside pickles for easier pipelines; keep pickles optional for debugging.
-
----
-
-## Success metrics (for future iterations)
-
-- Time to refresh full enterprise + farm catalog vs manual process.
-- Parse success rate on indicator cards (non-empty title/footer) from saved HTML.
-- Number of manual fixes required per portal release (proxy for selector stability).
-
----
-
-## Glossary
-
-| Term | Meaning |
-|------|---------|
-| **MDD** | My Dairy Dashboard — product context for the scraped UI. |
-| **Admin portal** | `admin.mydairydashboard.com` — enterprise and user administration. |
-| **Impersonation** | Admin action that opens the dashboard as a specific end user / farm account. |
-| **Indicator card** | Dashboard widget showing a metric, often with a Highcharts footer line. |
+- **[README.md](./README.md)** — install, run, environment variables.
+- **[prompt.md](./prompt.md)** — short AI / contributor context for the same four artifacts.
