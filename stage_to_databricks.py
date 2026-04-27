@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Move CSVs from mdd_downloads into files_to_data_bricks/<processor>/
+Move CSVs from mdd_downloads into files_to_data_bricks/<processor>/<farm>/
 with filenames prefixed as yyyymmdd_<original_name>.
 """
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import sys
 from datetime import datetime
@@ -17,10 +18,27 @@ REPO_ROOT = Path(__file__).resolve().parent
 FILES_TO_DATABRICKS = REPO_ROOT / "files_to_data_bricks"
 DOWNLOADS = REPO_ROOT / "mdd_downloads"
 MILK_REPORT_SUFFIX = "_Milk_Sample_Report"
+_DATED_CSV = re.compile(r"^\d{8}_.+\.csv$", re.IGNORECASE)
+
+
+def _name_for_farm_match(filename: str) -> str:
+    """If the download was already yyyymmdd_ prefixed, strip that for MDD stem matching."""
+    if _DATED_CSV.match(filename) and len(filename) > 9 and filename[8] == "_":
+        return filename[9:]
+    return filename
 
 
 def _farm_name_to_file_prefix(farm_name: str) -> str:
     return farm_name.replace(" ", "_")
+
+
+def _safe_farm_dir_name(farm_name: str) -> str:
+    """Build a single path segment for the farm folder (avoids / and \\)."""
+    s = farm_name.replace("/", "-").replace("\\", "-")
+    s = s.strip() or "unknown_farm"
+    if s in (".", ".."):
+        return f"_{s}"
+    return s
 
 
 def _match_farm_and_processor(
@@ -35,9 +53,10 @@ def _match_farm_and_processor(
         farms_with_processors, key=lambda t: len(t[0]), reverse=True
     )
     for farm_name, processor_name in sorted_rows:
+        name = _name_for_farm_match(filename)
         prefix = _farm_name_to_file_prefix(farm_name)
         stem = f"{prefix}{MILK_REPORT_SUFFIX}"
-        if filename.startswith(stem) and filename.lower().endswith(".csv"):
+        if name.startswith(stem) and name.lower().endswith(".csv"):
             return (farm_name, processor_name)
     return None
 
@@ -48,9 +67,20 @@ def _dated_filename(original: str, today: datetime | None = None) -> str:
     return f"{ymd}_{original}"
 
 
-def ensure_processor_folders() -> None:
+def _staged_basename(path: Path, today: datetime | None = None) -> str:
+    """Single yyyymmdd_ prefix: strip an existing one from the filename if present."""
+    name = path.name
+    if _DATED_CSV.match(name) and len(name) > 9 and name[8] == "_":
+        name = name[9:]
+    return _dated_filename(name, today=today)
+
+
+def ensure_staging_folders() -> None:
     for name in sqlAPI.list_of_processor_names():
         (FILES_TO_DATABRICKS / name).mkdir(parents=True, exist_ok=True)
+    for farm_name, processor_name in sqlAPI.get_all_farms_with_processors():
+        sub = FILES_TO_DATABRICKS / processor_name / _safe_farm_dir_name(farm_name)
+        sub.mkdir(parents=True, exist_ok=True)
 
 
 def organize_downloads(
@@ -69,7 +99,7 @@ def organize_downloads(
         return (0, 0, 0)
 
     if not dry_run:
-        ensure_processor_folders()
+        ensure_staging_folders()
 
     moved = 0
     skipped = 0
@@ -91,9 +121,11 @@ def organize_downloads(
             unmatched += 1
             continue
 
-        _farm_name, processor_name = match
-        dest_dir = FILES_TO_DATABRICKS / processor_name
-        new_name = _dated_filename(path.name, today=day)
+        farm_name, processor_name = match
+        dest_dir = (
+            FILES_TO_DATABRICKS / processor_name / _safe_farm_dir_name(farm_name)
+        )
+        new_name = _staged_basename(path, today=day)
         dest = dest_dir / new_name
 
         if dest.exists():
@@ -119,7 +151,7 @@ def organize_downloads(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Move mdd_downloads CSVs into files_to_data_bricks by processor."
+        description="Move mdd_downloads CSVs into files_to_data_bricks by processor and farm."
     )
     parser.add_argument(
         "--dry-run",

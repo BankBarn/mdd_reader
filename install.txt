@@ -1,3 +1,5 @@
 # Python dependencies for mdd_collector.py (see docs/README.md).
 selenium
 webdriver-manager
+# upload_to_databricks.py (Unity Catalog Volumes)
+databricks-sdk
