@@ -1,0 +1,256 @@
+{
+  "id": "540a64e1-12a5-4494-bf82-ecef5f38f195",
+  "version": "3.0",
+  "name": "New Project",
+  "url": "http://www.google.com",
+  "urls": [
+    "http://www.google.com"
+  ],
+  "plugins": [],
+  "suites": [
+    {
+      "id": "f10a893d-275a-48bf-9982-53da93529176",
+      "name": "New Suite",
+      "parallel": false,
+      "persistSession": false,
+      "tests": [
+        "cdf8f2ce-a66d-44e8-864f-c0bd56cacfea"
+      ],
+      "timeout": 30000
+    }
+  ],
+  "tests": [
+    {
+      "id": "cdf8f2ce-a66d-44e8-864f-c0bd56cacfea",
+      "name": "New Test",
+      "commands": [
+        {
+          "id": "6547ad59-9c3e-452e-8141-7a3b38991db9",
+          "command": "open",
+          "target": "https://tillamookproducers.com/Home/Login",
+          "value": "",
+          "opensWindow": false,
+          "Window Timeout": ""
+        },
+        {
+          "command": "//pause",
+          "target": "1000",
+          "value": "",
+          "id": "5f6c9a09-6339-49a2-8c42-ec4130ed7675"
+        },
+        {
+          "command": "click",
+          "target": "id=Username",
+          "value": "",
+          "insertBeforeLastCommand": false,
+          "frameLocation": "root",
+          "winHandleId": "root",
+          "id": "8e4ea40d-6e35-452b-8edb-edf7d9349fed",
+          "targets": [
+            [
+              "id=Username",
+              "id"
+            ],
+            [
+              "name=Username",
+              "name"
+            ],
+            [
+              "css=#Username",
+              "css:finder"
+            ],
+            [
+              "xpath=(//input[@id='Username'])[1]",
+              "xpath:attributes"
+            ],
+            [
+              "xpath=(//div[@id='loginFormContainer']/form/p[2]/input)[1]",
+              "xpath:idRelative"
+            ]
+          ],
+          "comment": "Username",
+          "fallbackTargets": [
+            [
+              "id=Username",
+              "id"
+            ],
+            [
+              "name=Username",
+              "name"
+            ],
+            [
+              "css=#Username",
+              "css:finder"
+            ],
+            [
+              "xpath=(//input[@id='Username'])[1]",
+              "xpath:attributes"
+            ],
+            [
+              "xpath=(//div[@id='loginFormContainer']/form/p[2]/input)[1]",
+              "xpath:idRelative"
+            ]
+          ]
+        },
+        {
+          "command": "type",
+          "target": "id=Username",
+          "value": "1224",
+          "insertBeforeLastCommand": false,
+          "frameLocation": "root",
+          "winHandleId": "root",
+          "id": "0e8058f9-a09f-40fd-94e3-ffcab7585411",
+          "targets": [
+            [
+              "id=Username",
+              "id"
+            ],
+            [
+              "name=Username",
+              "name"
+            ],
+            [
+              "css=#Username",
+              "css:finder"
+            ],
+            [
+              "xpath=(//input[@id='Username'])[1]",
+              "xpath:attributes"
+            ],
+            [
+              "xpath=(//div[@id='loginFormContainer']/form/p[2]/input)[1]",
+              "xpath:idRelative"
+            ]
+          ]
+        },
+        {
+          "command": "click",
+          "target": "id=passwordInput",
+          "value": "",
+          "id": "82c5fa66-303f-43d5-bbf4-80c9ee0859e2",
+          "fallbackTargets": [
+            [
+              "id=passwordInput",
+              "id"
+            ],
+            [
+              "name=Password",
+              "name"
+            ],
+            [
+              "css=#passwordInput",
+              "css:finder"
+            ],
+            [
+              "xpath=(//input[@id='passwordInput'])[1]",
+              "xpath:attributes"
+            ],
+            [
+              "xpath=(//div[@id='loginFormContainer']/form/div[3]/input)[1]",
+              "xpath:idRelative"
+            ]
+          ]
+        },
+        {
+          "command": "type",
+          "target": "id=passwordInput",
+          "value": "w29666",
+          "insertBeforeLastCommand": false,
+          "frameLocation": "root",
+          "winHandleId": "root",
+          "targets": [
+            [
+              "id=Username",
+              "id"
+            ],
+            [
+              "name=Username",
+              "name"
+            ],
+            [
+              "css=#Username",
+              "css:finder"
+            ],
+            [
+              "xpath=(//input[@id='Username'])[1]",
+              "xpath:attributes"
+            ],
+            [
+              "xpath=(//div[@id='loginFormContainer']/form/p[2]/input)[1]",
+              "xpath:idRelative"
+            ]
+          ],
+          "id": "104ac892-ed8d-4797-8444-88bee8039058"
+        },
+        {
+          "command": "//pause",
+          "target": "10000000",
+          "value": "",
+          "id": "478a1c7b-96ef-43d3-b79d-e61cabd54f88"
+        },
+        {
+          "command": "click",
+          "target": "id=loginBtn",
+          "value": "",
+          "id": "3310abef-9389-4fb5-84fe-4c7928b707e5",
+          "fallbackTargets": [
+            [
+              "id=loginBtn",
+              "id"
+            ],
+            [
+              "css=#loginBtn",
+              "css:finder"
+            ],
+            [
+              "xpath=(//button[@id='loginBtn'])[1]",
+              "xpath:attributes"
+            ],
+            [
+              "xpath=(//div[@id='loginFormContainer']/form/div[5]/div/button)[1]",
+              "xpath:idRelative"
+            ],
+            [
+              "xpath=//button[contains(.,'Login')]",
+              "xpath:innerText"
+            ]
+          ]
+        },
+        {
+          "command": "pause",
+          "target": "4000",
+          "value": "",
+          "id": "d1af0ab3-d922-4b4e-a01f-66988dbdee69"
+        },
+        {
+          "command": "click",
+          "target": "css=#rbdComponentresults_wrapper .buttons-csv > span",
+          "value": "",
+          "id": "4fdb9661-1502-4a33-ae1e-81b6039bc0e4",
+          "fallbackTargets": [
+            [
+              "css=#rbdComponentresults_wrapper .buttons-csv > span",
+              "css:finder"
+            ],
+            [
+              "xpath=(//div[@id='rbdComponentresults_wrapper']/div/div[2]/div/button[3]/span)[1]",
+              "xpath:idRelative"
+            ],
+            [
+              "xpath=//span[contains(.,'CSV')]",
+              "xpath:innerText"
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "snapshot": {
+    "dependencies": {},
+    "tests": [],
+    "jest": {
+      "extraGlobals": []
+    }
+  },
+  "delay": 1000
+}
