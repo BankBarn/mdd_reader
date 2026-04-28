@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 import glob
 import os
+import shutil
 import sqlAPI_tillamook
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -15,6 +16,9 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 DOWNLOAD_DIR = os.path.join(os.getcwd(), "tillamook_downloads")
+STAGING_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "files_to_data_bricks", "Tillamook")
+)
 
 
 class tillamook_export():
@@ -54,7 +58,35 @@ class tillamook_export():
             new_path = os.path.join(farm_dir, new_name)
             os.rename(downloaded_file, new_path)
             print(f"Renamed to: {new_path}")
-            
+        self._move_tillamook_downloads_to_staging()
+
+    def _move_tillamook_downloads_to_staging(self):
+        """Move per-farm subfolders from tillamook_downloads/ to files_to_data_bricks/Tillamook/."""
+        os.makedirs(STAGING_DIR, exist_ok=True)
+        for item in os.listdir(DOWNLOAD_DIR):
+            src = os.path.join(DOWNLOAD_DIR, item)
+            if not os.path.isdir(src):
+                continue
+            dest = os.path.join(STAGING_DIR, item)
+            if not os.path.exists(dest):
+                shutil.move(src, dest)
+                print(f"Moved: {src} -> {dest}")
+                continue
+            for fname in os.listdir(src):
+                fsrc = os.path.join(src, fname)
+                if not os.path.isfile(fsrc):
+                    continue
+                fdest = os.path.join(dest, fname)
+                if os.path.exists(fdest):
+                    print(f"Skip (exists in staging): {fdest}")
+                    continue
+                shutil.move(fsrc, fdest)
+                print(f"Moved: {fsrc} -> {fdest}")
+            try:
+                if not os.listdir(src):
+                    os.rmdir(src)
+            except OSError:
+                pass
 
     def wait_for_download(self, files_before, timeout=60):
         end_time = time.time() + timeout
