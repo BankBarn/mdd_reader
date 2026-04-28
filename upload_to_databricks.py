@@ -12,11 +12,13 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator
 
+from dotenv import load_dotenv
+
 if TYPE_CHECKING:
     from databricks.sdk import WorkspaceClient
 
-# Same staging root as stage_to_databricks.py
 REPO_ROOT = Path(__file__).resolve().parent
+load_dotenv(REPO_ROOT / ".env")
 FILES_TO_DATABRICKS = REPO_ROOT / "files_to_data_bricks"
 DEFAULT_VOLUME_BASE = "/Volumes/data_eng_dev/processor_raw/files"
 

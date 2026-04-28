@@ -3,6 +3,7 @@ import sys
 import time
 import traceback
 import sqlAPI
+import stage_to_databricks
 
 from selenium import webdriver
 from selenium.common.exceptions import StaleElementReferenceException
@@ -490,6 +491,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+        stage_to_databricks.main()
     except Exception as exc:
         print(exc, file=sys.stderr)
         if _debug_enabled():
