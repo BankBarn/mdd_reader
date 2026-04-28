@@ -2,6 +2,7 @@
 import pytest
 import time
 import json
+from datetime import datetime
 import glob
 import os
 import sqlAPI_tillamook
@@ -19,7 +20,14 @@ DOWNLOAD_DIR = os.path.join(os.getcwd(), "tillamook_downloads")
 class tillamook_export():
 
     def setup_method(self, method):
-        self.driver = webdriver.Chrome()
+        os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+        options = webdriver.ChromeOptions()
+        prefs = {
+            "download.default_directory": DOWNLOAD_DIR,
+            "download.prompt_for_download": False,
+        }
+        options.add_experimental_option("prefs", prefs)
+        self.driver = webdriver.Chrome(options=options)
         self.vars = {}
 
     def teardown_method(self, method):
@@ -37,7 +45,16 @@ class tillamook_export():
             time.sleep(4)
             files_before = set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.csv")))
             self.driver.find_element(By.CSS_SELECTOR, "#rbdComponentresults_wrapper .buttons-csv > span").click()
-            self.wait_for_download(files_before)
+            downloaded_file = self.wait_for_download(files_before)
+            date_str = datetime.now().strftime("%Y%m%d")
+            farm_slug = farm[0].replace(" ", "_")
+            farm_dir = os.path.join(DOWNLOAD_DIR, farm_slug)
+            os.makedirs(farm_dir, exist_ok=True)
+            new_name = f"{date_str}_{farm_slug}_productiondata.csv"
+            new_path = os.path.join(farm_dir, new_name)
+            os.rename(downloaded_file, new_path)
+            print(f"Renamed to: {new_path}")
+            
 
     def wait_for_download(self, files_before, timeout=60):
         end_time = time.time() + timeout
